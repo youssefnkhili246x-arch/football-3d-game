@@ -4,7 +4,7 @@ import cors from "cors";
 import { Server } from "socket.io";
 import { env } from "./config/env.js";
 import { supabase } from "./config/supabase.js";
-import { socketAuth } from "./middleware/auth.js";
+import { registerSockets } from "./sockets/index.js";
 import { ApiError } from "./utils/http.js";
 import authRoutes from "./routes/auth.js";
 import profileRoutes from "./routes/profile.js";
@@ -50,22 +50,7 @@ const io = new Server(server, {
   cors: { origin: env.corsOrigins },
 });
 
-// Every socket must present a valid Supabase access token
-io.use(socketAuth);
-
-io.on("connection", (socket) => {
-  const userId = socket.data.user.id;
-  console.log(`socket connected: ${socket.id} (user ${userId})`);
-
-  // Simple connectivity test from the HTML5 client
-  socket.on("ping_server", (ack) => {
-    if (typeof ack === "function") ack({ pong: Date.now() });
-  });
-
-  socket.on("disconnect", (reason) => {
-    console.log(`socket disconnected: ${socket.id} (${reason})`);
-  });
-});
+registerSockets(io); // auth, rooms, matchmaking
 
 // ---------- Start / shutdown ----------
 server.listen(env.port, () => {
