@@ -4,6 +4,10 @@ import cors from "cors";
 import { Server } from "socket.io";
 import { env } from "./config/env.js";
 import { supabase } from "./config/supabase.js";
+import { socketAuth } from "./middleware/auth.js";
+import { ApiError } from "./utils/http.js";
+import authRoutes from "./routes/auth.js";
+import profileRoutes from "./routes/profile.js";
 
 // ---------- Express ----------
 const app = express();
@@ -25,12 +29,16 @@ app.get("/health", async (_req, res) => {
   }
 });
 
-// TODO: app.use("/api/...", routes) goes here, before the 404 handler
+// ---------- API routes ----------
+app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes);
 
 app.use((_req, res) => res.status(404).json({ error: "not_found" }));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
+  if (err instanceof ApiError) return res.status(err.status).json({ error: err.code });
+  if (err.type === "entity.parse.failed") return res.status(400).json({ error: "invalid_json" });
   console.error(err);
   res.status(500).json({ error: "server_error" });
 });
@@ -42,8 +50,12 @@ const io = new Server(server, {
   cors: { origin: env.corsOrigins },
 });
 
+// Every socket must present a valid Supabase access token
+io.use(socketAuth);
+
 io.on("connection", (socket) => {
-  console.log(`socket connected: ${socket.id}`);
+  const userId = socket.data.user.id;
+  console.log(`socket connected: ${socket.id} (user ${userId})`);
 
   // Simple connectivity test from the HTML5 client
   socket.on("ping_server", (ack) => {
