@@ -24,3 +24,17 @@ export async function setMatchStatus(matchId, status) {
   const { error } = await supabase.from("matches").update(patch).eq("id", matchId);
   if (error) throw error;
 }
+
+// Saves the final score and closes the match
+export async function finishMatch(matchId, homeScore, awayScore) {
+  const { error } = await supabase
+    .from("matches")
+    .update({
+      status: "finished",
+      home_score: homeScore,
+      away_score: awayScore,
+      ended_at: new Date().toISOString(),
+    })
+    .eq("id", matchId);
+  if (error) throw error;
+}
