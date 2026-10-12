@@ -1,5 +1,6 @@
 import { socketAuth } from "../middleware/auth.js";
 import { handleDisconnect, registerLobbyHandlers, restoreSession } from "./lobby.socket.js";
+import { registerMatchHandlers } from "./match.socket.js";
 
 const userSockets = new Map(); // userId -> socket.id (one active connection per user)
 
@@ -24,6 +25,7 @@ export function registerSockets(io) {
     }
 
     registerLobbyHandlers(io, socket);
+    registerMatchHandlers(socket);
     restoreSession(io, socket);
 
     // Simple connectivity test from the HTML5 client
