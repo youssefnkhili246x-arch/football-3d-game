@@ -2,6 +2,7 @@ import { ApiError } from "../utils/http.js";
 import { getProfile } from "../services/profile.service.js";
 import { createMatch, setMatchStatus } from "../services/match.service.js";
 import * as rooms from "../game/roomManager.js";
+import { startMatchLoop } from "../game/matchRunner.js";
 
 const QUICK_MATCH_WAIT_MS = 20_000; // public room waits for more players, then starts with bots
 const EMPTY_LIVE_GRACE_MS = 60_000; // live match with no connected human is closed after this
@@ -16,7 +17,7 @@ async function requireProfile(socket) {
 }
 
 function abandonMatch(room) {
-  if (!room.matchId) return;
+  if (!room.matchId || room.status !== "live") return; // never overwrite a finished match
   setMatchStatus(room.matchId, "abandoned").catch((err) =>
     console.error("could not mark match abandoned:", err.message)
   );
@@ -49,6 +50,7 @@ async function startMatch(io, room) {
     rooms.completeStart(room, matchId);
     broadcast(io, room);
     io.to(channel(room)).emit("match:start", { matchId, room: rooms.publicView(room) });
+    startMatchLoop(io, room);
   } catch (err) {
     if (rooms.isActive(room)) {
       rooms.abortStart(room);
