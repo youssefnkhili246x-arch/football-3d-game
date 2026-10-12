@@ -249,3 +249,16 @@ export function destroyRoom(room) {
   for (const slot of seatedHumans(room)) userRoom.delete(slot.userId);
   rooms.delete(room.code);
 }
+
+// ---------- match end / lookups used by the match runner ----------
+export function finishRoom(room) {
+  clearTimeout(room.emptyTimer);
+  room.emptyTimer = null;
+  room.status = "finished";
+}
+
+export function seatOf(userId) {
+  const room = getRoomOf(userId);
+  const found = room ? findSlot(room, userId) : null;
+  return found ? { room, side: found.side, index: found.index } : null;
+}
