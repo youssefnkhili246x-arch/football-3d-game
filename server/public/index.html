@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Football</title>
+<style>
+  :root { color-scheme: dark; --bg:#0f172a; --card:#1e293b; --text:#e2e8f0; --muted:#94a3b8; --accent:#22c55e; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:15px/1.4 system-ui, sans-serif; overscroll-behavior:none; }
+  .hidden { display:none !important; }
+  .muted { color:var(--muted); font-size:13px; }
+  .screen { max-width:480px; margin:0 auto; padding:16px; padding-top:max(16px, env(safe-area-inset-top)); }
+  .card { background:var(--card); border-radius:12px; padding:14px; margin-bottom:12px; }
+  label { display:block; color:var(--muted); font-size:13px; }
+  input, select, button { font:inherit; width:100%; padding:12px; margin:4px 0; border-radius:10px; border:1px solid #334155; background:#0b1220; color:inherit; }
+  button { background:var(--accent); color:#04200f; font-weight:700; border:0; cursor:pointer; }
+  button.secondary { background:#334155; color:var(--text); }
+  button:disabled { opacity:.45; }
+  .row { display:flex; gap:8px; align-items:flex-end; }
+  .row > * { flex:1; }
+  .cols { display:flex; gap:8px; margin:8px 0; }
+  .cols > div { flex:1; }
+  .slot { padding:4px 8px; margin:2px 0; border-radius:6px; background:#0b1220; font-size:13px; }
+  .slot.human { background:#14532d; }
+  .slot.bot { color:var(--muted); }
+  h3 { margin:4px 0; } h3.home { color:#3b82f6; } h3.away { color:#ef4444; }
+  #toast { position:fixed; top:max(10px, env(safe-area-inset-top)); left:50%; transform:translateX(-50%); background:#000c; padding:10px 16px; border-radius:20px; z-index:50; opacity:0; transition:opacity .2s; pointer-events:none; max-width:90%; }
+  #toast.show { opacity:1; }
+
+  #game { position:fixed; inset:0; touch-action:none; user-select:none; -webkit-user-select:none; background:#0b3d17; }
+  #c { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:absolute; top:env(safe-area-inset-top); left:0; right:0; padding:8px; text-align:center; font-weight:700; font-size:17px; text-shadow:0 1px 3px #000; pointer-events:none; }
+  #banner { position:absolute; top:38%; left:0; right:0; text-align:center; font-size:56px; font-weight:800; text-shadow:0 2px 8px #000; pointer-events:none; }
+  #stickZone { position:absolute; left:max(16px, env(safe-area-inset-left)); bottom:max(24px, env(safe-area-inset-bottom)); width:150px; height:150px; border-radius:50%; background:#ffffff1f; border:2px solid #ffffff4d; touch-action:none; }
+  #knob { position:absolute; left:50%; top:50%; width:60px; height:60px; margin:-30px 0 0 -30px; border-radius:50%; background:#ffffff73; pointer-events:none; }
+  #btns { position:absolute; right:max(16px, env(safe-area-inset-right)); bottom:max(24px, env(safe-area-inset-bottom)); display:flex; flex-direction:column; align-items:flex-end; gap:12px; }
+  .act { width:78px; height:78px; padding:0; margin:0; border-radius:50%; background:#ffffff33; color:#fff; border:2px solid #ffffff80; font-size:13px; touch-action:none; }
+  .act.big { width:104px; height:104px; font-size:16px; background:#ef444499; }
+  .act.on { background:#22c55ecc; }
+  #result { position:absolute; inset:0; background:#020617cc; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; font-size:28px; font-weight:700; padding:24px; }
+  #result button { width:220px; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<section id="auth" class="screen hidden">
+  <h2>⚽ Football</h2>
+  <div class="card">
+    <input id="email" type="email" placeholder="Email" autocomplete="email">
+    <input id="password" type="password" placeholder="Password (8+ characters)" autocomplete="current-password">
+    <input id="username" placeholder="Username (Register only)" autocomplete="username">
+    <div class="row"><button id="btnLogin">Login</button><button id="btnRegister" class="secondary">Register</button></div>
+  </div>
+  <p class="muted">Server: <span id="serverUrl"></span></p>
+</section>
+
+<section id="profile" class="screen hidden">
+  <h2>Create your profile</h2>
+  <div class="card">
+    <input id="profName" placeholder="Username (3-20: letters, numbers, _)">
+    <button id="btnProfile">Save</button>
+  </div>
+</section>
+
+<section id="lobby" class="screen hidden">
+  <div class="row">
+    <div><b id="who"></b><div id="status" class="muted"></div></div>
+    <button id="btnLogout" class="secondary" style="max-width:110px">Logout</button>
+  </div>
+
+  <div id="setup" class="card">
+    <label>Mode
+      <select id="mode">
+        <option value="pro_clubs">Pro Clubs (home vs away)</option>
+        <option value="coop_tournament">Co-op vs AI</option>
+      </select>
+    </label>
+    <div class="row">
+      <label>Team size <select id="size"></select></label>
+      <label>AI level <select id="diff"></select></label>
+    </div>
+    <button id="btnQuick">Quick match</button>
+    <button id="btnCreate" class="secondary">Create private room</button>
+    <div class="row">
+      <label>Room code <input id="joinCode" placeholder="ABCDE" maxlength="5" autocapitalize="characters"></label>
+      <label>Side <select id="side"><option value="">Auto</option><option value="home">Home</option><option value="away">Away</option></select></label>
+    </div>
+    <button id="btnJoin" class="secondary">Join room</button>
+  </div>
+
+  <div id="roomCard" class="card hidden">
+    <div id="roomInfo"></div>
+    <div id="roomHint" class="muted"></div>
+    <div class="cols">
+      <div><h3 class="home">HOME</h3><div id="homeList"></div></div>
+      <div><h3 class="away">AWAY</h3><div id="awayList"></div></div>
+    </div>
+    <div class="row"><button id="btnReady" class="secondary">Ready</button><button id="btnStart">Start match</button></div>
+    <button id="btnLeave" class="secondary">Leave room</button>
+  </div>
+</section>
+
+<section id="game" class="hidden">
+  <canvas id="c"></canvas>
+  <div id="hud"></div>
+  <div id="banner"></div>
+  <div id="stickZone"><div id="knob"></div></div>
+  <div id="btns">
+    <button id="bShoot" class="act big">SHOOT</button>
+    <button id="bPass" class="act">PASS</button>
+    <button id="bSprint" class="act">SPRINT</button>
+  </div>
+  <div id="result" class="hidden">
+    <div id="resultTitle"></div>
+    <div id="resultScore"></div>
+    <button id="btnBack">Back to lobby</button>
+  </div>
+</section>
+
+<script src="js/net.js"></script>
+<script src="js/lobby.js"></script>
+<script src="js/predict.js"></script>
+<script src="js/game.js"></script>
+<script src="js/controls.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
