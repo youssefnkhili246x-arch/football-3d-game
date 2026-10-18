@@ -1,4 +1,5 @@
 import http from "node:http";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import { Server } from "socket.io";
@@ -13,6 +14,9 @@ import profileRoutes from "./routes/profile.js";
 const app = express();
 app.use(cors({ origin: env.corsOrigins }));
 app.use(express.json({ limit: "100kb" }));
+
+// Game client (server/public), served from the same origin
+app.use(express.static(fileURLToPath(new URL("../public", import.meta.url))));
 
 // Health check: server + database
 app.get("/health", async (_req, res) => {
