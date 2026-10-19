@@ -2,7 +2,7 @@ import { performance } from "node:perf_hooks";
 import * as rooms from "./roomManager.js";
 import { MatchWorld } from "./engine/world.js";
 import { DT, SNAPSHOT_EVERY } from "./engine/constants.js";
-import { finishMatch } from "../services/match.service.js";
+import { finishMatch, rewardMatch } from "../services/match.service.js";
 
 const INPUT_TIMEOUT_MS = 500; // a human who stops sending input stops moving
 const MAX_CATCHUP_STEPS = 5; // never simulate more than this many ticks per timer call
@@ -34,6 +34,18 @@ function syncControllers(room, world, lastInput) {
   }
 }
 
+// every human who played gets the result of his side (win / draw / loss)
+function participantsOf(room, score) {
+  const out = [];
+  for (const side of ["home", "away"]) {
+    const mine = side === "home" ? score[0] : score[1];
+    const theirs = side === "home" ? score[1] : score[0];
+    const result = mine > theirs ? "win" : mine < theirs ? "loss" : "draw";
+    for (const slot of room.sides[side]) if (slot.userId) out.push({ userId: slot.userId, result });
+  }
+  return out;
+}
+
 function endMatch(io, room, world) {
   stop(room);
   const { score, goals } = world.result();
@@ -44,6 +56,9 @@ function endMatch(io, room, world) {
   io.to(ch).emit("match:end", { score, goals });
   finishMatch(room.matchId, score[0], score[1]).catch((err) =>
     console.error("could not save match result:", err.message)
+  );
+  rewardMatch(room.matchId, participantsOf(room, score)).catch((err) =>
+    console.error("could not grant match rewards:", err.message)
   );
 
   setTimeout(() => {
