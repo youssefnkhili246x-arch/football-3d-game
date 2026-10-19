@@ -38,3 +38,23 @@ export async function finishMatch(matchId, homeScore, awayScore) {
     .eq("id", matchId);
   if (error) throw error;
 }
+
+// Match rewards: Coins (cosmetics) for every human player, club budget for club owners.
+const REWARDS = {
+  win: { coins: 50, budget: 250000 },
+  draw: { coins: 25, budget: 100000 },
+  loss: { coins: 10, budget: 50000 },
+};
+
+// participants: [{ userId, result: "win" | "draw" | "loss" }]. Granted once per player and match.
+export async function rewardMatch(matchId, participants) {
+  if (participants.length === 0) return 0;
+  const rewards = participants.map((p) => ({
+    profile_id: p.userId,
+    coins: REWARDS[p.result].coins,
+    budget: REWARDS[p.result].budget,
+  }));
+  const { data, error } = await supabase.rpc("grant_match_rewards", { p_match: matchId, p_rewards: rewards });
+  if (error) throw error;
+  return data;
+}
